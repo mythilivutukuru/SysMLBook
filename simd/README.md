@@ -6,7 +6,9 @@ Your completed implementation will be verified against a reference CPU implement
 
 ---
 
-## Register Widths
+## Background
+
+### Register Widths
 
 | ISA Extension | Register Width | `double` lanes |
 |---|---|---|
@@ -50,9 +52,7 @@ You must use **AVX-512 intrinsics** (`__m512d`, 512-bit registers) to vectorize 
 
 You are **not** required to implement tiling or loop reordering for this task, though you may if you wish for extra performance.
 
----
-
-## Algorithm Sketch
+### Algorithm Sketch
 
 ```
 for i in [0, size):                        // row of A and C
@@ -67,7 +67,7 @@ for i in [0, size):                        // row of A and C
 
 ---
 
-## Building
+## Testing
 
 A C++ compiler with AVX-512 support is required.
 

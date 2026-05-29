@@ -40,7 +40,7 @@ Each assignment lives in its own folder with these files:
 
 | Assignment | Topic | Language |
 |------------|-------|----------|
-| [SIMD](./simd) | Single Instruction, Multiple Data | C++ |
+| [SIMD](./simd) | SIMD Matrix Multiplication | C++ |
 
 > More chapters and assignments will be added over time.
 
