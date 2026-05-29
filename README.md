@@ -2,7 +2,7 @@
 
 Companion repository for the textbook **"Systems for Machine Learning"**.
 
-📖 **Textbook:** [sysml](https://www.cse.iitb.ac.in/~mythili/sysml/)
+📖 [**Textbook**](https://www.cse.iitb.ac.in/~mythili/sysml/)
 
 Each assignment gives you hands-on practice with the concepts covered in the book. Work through them chapter by chapter alongside your reading.
 
