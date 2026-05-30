@@ -42,6 +42,7 @@ Each assignment lives in its own folder with these files:
 |------------|-------|----------|
 | [SIMD](./simd) | SIMD Matrix Multiplication | C++ |
 | [CNN](./convolutional_neural_network/) | Convolutional Neural Network | CUDA |
+| [Matrix_Transpose](./matrix_transpose_shared_memory/) | Matrix Transpose Using Shared Memory | CUDA |
 
 > More chapters and assignments will be added over time.
 
