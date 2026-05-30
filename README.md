@@ -45,3 +45,19 @@ Each assignment lives in its own folder with these files:
 > More chapters and assignments will be added over time.
 
 ---
+
+## Citation
+
+If you use this material, please cite the textbook:
+
+```bibtex
+@book{vutukuru_sysml,
+  title       = {Systems for Machine Learning},
+  author      = {Mythili Vutukuru and Saksham Rathi},
+  year        = {2026},
+  institution = {Indian Institute of Technology Bombay},
+  url         = {https://www.cse.iitb.ac.in/~mythili/sysml/}
+}
+```
+
+---
