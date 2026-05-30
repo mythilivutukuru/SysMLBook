@@ -41,6 +41,7 @@ Each assignment lives in its own folder with these files:
 | Assignment | Topic | Language |
 |------------|-------|----------|
 | [SIMD](./simd) | SIMD Matrix Multiplication | C++ |
+| [CNN](./convolutional_neural_network/) | Convolutional Neural Network | CUDA |
 
 > More chapters and assignments will be added over time.
 
