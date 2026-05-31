@@ -48,6 +48,7 @@ Each assignment lives in its own folder with these files:
 | [Matrix_Transpose](./matrix_transpose_shared_memory/) | Matrix Transpose Using Shared Memory | CUDA |
 | [Standard_Attention](./standard_attention_shared_memory/) | Standard Attention Using Shared Memory | CUDA |
 | [MLP_Forward_Pass](./mlp_forward_pass/) | MLP Forward Pass | CUDA |
+| [MLP_Forward_Pass_Streams](./mlp_forward_pass_streams/) | MLP Forward Pass with Streams | CUDA |
 
 > More chapters and assignments will be added over time.
 
