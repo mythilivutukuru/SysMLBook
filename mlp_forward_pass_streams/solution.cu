@@ -6,10 +6,13 @@
 /* ─────────────────────────────────────────────────────────────────────────────
  * Network dimensions
  * ───────────────────────────────────────────────────────────────────────────── */
-#define N     64
-#define D_IN  32
-#define D_H   64
-#define D_OUT 16
+#define N       64      /* batch size                  */
+#define D_IN    32      /* input feature dimension     */
+#define D_H     64      /* hidden layer width          */
+#define D_OUT   16      /* output dimension            */
+
+#define NUM_STREAMS 4                  /* number of concurrent streams   */
+#define CHUNK       (N / NUM_STREAMS)  /* rows per stream  (= 16)        */
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Error-checking macro
@@ -28,6 +31,11 @@
  * KERNEL 1 — Fused Matrix-Multiply + ReLU
  *
  * C[i][j] = ReLU( sum_k A[i][k] * B[k][j]  +  bias[j] )
+ *
+ * A      : (rows_A, inner)   — a CHUNK-row slice of X or H
+ * B      : (inner,  cols_B)  — full weight matrix
+ * bias   : (cols_B,)
+ * C      : (rows_A, cols_B)  — output slice
  * ═════════════════════════════════════════════════════════════════════════════*/
 __global__ void matmul_relu_kernel(const float *A,
                                    const float *B,
@@ -37,22 +45,16 @@ __global__ void matmul_relu_kernel(const float *A,
                                    int inner,
                                    int cols_B)
 {
-    /* TODO 1 — Row and column indices */
     int col = threadIdx.x + blockIdx.x * blockDim.x;
     int row = threadIdx.y + blockIdx.y * blockDim.y;
 
-    /* TODO 2 — Bounds guard */
     if (row >= rows_A || col >= cols_B) return;
 
-    /* TODO 3 — Dot product */
     float acc = 0.0f;
     for (int k = 0; k < inner; ++k)
         acc += A[row * inner + k] * B[k * cols_B + col];
 
-    /* TODO 4 — Bias */
     acc += bias[col];
-
-    /* TODO 5 — ReLU and write */
     C[row * cols_B + col] = fmaxf(acc, 0.0f);
 }
 
@@ -70,25 +72,21 @@ __global__ void matmul_kernel(const float *A,
                               int inner,
                               int cols_B)
 {
-    /* TODO 6 — Row and column indices */
     int col = threadIdx.x + blockIdx.x * blockDim.x;
     int row = threadIdx.y + blockIdx.y * blockDim.y;
 
-    /* TODO 7 — Bounds guard */
     if (row >= rows_A || col >= cols_B) return;
 
-    /* TODO 8 — Dot product */
     float acc = 0.0f;
     for (int k = 0; k < inner; ++k)
         acc += A[row * inner + k] * B[k * cols_B + col];
 
-    /* TODO 9 — Bias, write (no ReLU) */
     C[row * cols_B + col] = acc + bias[col];
 }
 
 
 /* ═════════════════════════════════════════════════════════════════════════════
- * CPU REFERENCE IMPLEMENTATION
+ * CPU REFERENCE IMPLEMENTATION — do not modify
  * ═════════════════════════════════════════════════════════════════════════════*/
 static void mlp_cpu(const float *X,
                     const float *W1, const float *b1,
@@ -96,7 +94,6 @@ static void mlp_cpu(const float *X,
                           float *H,
                           float *Y)
 {
-    /* Layer 1: H = ReLU(X @ W1 + b1) */
     for (int i = 0; i < N; ++i) {
         for (int j = 0; j < D_H; ++j) {
             float acc = b1[j];
@@ -105,8 +102,6 @@ static void mlp_cpu(const float *X,
             H[i * D_H + j] = acc > 0.0f ? acc : 0.0f;
         }
     }
-
-    /* Layer 2: Y = H @ W2 + b2 */
     for (int i = 0; i < N; ++i) {
         for (int j = 0; j < D_OUT; ++j) {
             float acc = b2[j];
@@ -119,72 +114,135 @@ static void mlp_cpu(const float *X,
 
 
 /* ═════════════════════════════════════════════════════════════════════════════
- * GPU LAUNCH WRAPPER
+ * GPU LAUNCH WRAPPER — 4-stream version
+ *
+ * Design
+ * ──────
+ * The batch (N rows) is split into NUM_STREAMS equal chunks of CHUNK rows each.
+ * Stream s owns rows  [s*CHUNK , (s+1)*CHUNK).
+ *
+ * Phase 0  (one-time, blocking):
+ *   Copy the shared weight matrices W1, b1, W2, b2 to the device once via a
+ *   simple synchronous copy.  These are read-only inputs shared by every
+ *   stream, so copying them a single time is correct and avoids redundant
+ *   transfers.
+ *
+ * Phase 1  (all 4 streams in flight simultaneously):
+ *   For each stream s:
+ *     a) cudaMemcpyAsync  X slice  →  d_X  + s*CHUNK*D_IN       [H2D]
+ *     b) matmul_relu_kernel on the CHUNK-row slice                [compute]
+ *        reads  d_X slice  +  d_W1 / d_b1  (already on device)
+ *        writes d_H slice
+ *     c) matmul_kernel on the CHUNK-row slice                    [compute]
+ *        reads  d_H slice  +  d_W2 / d_b2
+ *        writes d_Y slice
+ *     d) cudaMemcpyAsync  d_Y slice  →  h_Y  + s*CHUNK*D_OUT    [D2H]
+ *
+ * Because operations within a single stream are ordered, steps (a)→(b)→(c)→(d)
+ * are guaranteed to run in sequence for that stream.  Across streams the GPU
+ * scheduler can overlap H2D copies of stream s+1 with kernel execution of
+ * stream s, delivering real throughput gains on hardware with a copy engine.
+ *
+ * Phase 2:
+ *   Synchronise and destroy all four streams.
  * ═════════════════════════════════════════════════════════════════════════════*/
-static void mlp_forward_gpu(const float *h_X,
+static void mlp_forward_gpu(/* pinned host inputs */
+                             const float *h_X,
                              const float *h_W1, const float *h_b1,
                              const float *h_W2, const float *h_b2,
+                             /* pinned host output */
                                    float *h_Y,
+                             /* pre-allocated device buffers */
                                    float *d_X,
                                    float *d_W1, float *d_b1,
                                    float *d_W2, float *d_b2,
                                    float *d_H,
                                    float *d_Y)
 {
-    /* TODO 10 — Create stream */
-    cudaStream_t stream;
-    CUDA_CHECK( cudaStreamCreate(&stream) );
+    /* ── Phase 0: copy shared weights once (synchronous, tiny) ─────────────── */
+    /*
+     * W1, b1, W2, b2 are identical for every chunk; copy them once before
+     * any stream touches them.  Using blocking cudaMemcpy here is fine because
+     * the weight transfers are tiny compared to the compute and they only
+     * happen once per forward pass.
+     */
+    CUDA_CHECK( cudaMemcpy(d_W1, h_W1,
+                           D_IN * D_H  * sizeof(float),
+                           cudaMemcpyHostToDevice) );
+    CUDA_CHECK( cudaMemcpy(d_b1, h_b1,
+                           D_H         * sizeof(float),
+                           cudaMemcpyHostToDevice) );
+    CUDA_CHECK( cudaMemcpy(d_W2, h_W2,
+                           D_H  * D_OUT * sizeof(float),
+                           cudaMemcpyHostToDevice) );
+    CUDA_CHECK( cudaMemcpy(d_b2, h_b2,
+                           D_OUT        * sizeof(float),
+                           cudaMemcpyHostToDevice) );
 
-    /* TODO 11-15 — Async H2D copies */
-    CUDA_CHECK( cudaMemcpyAsync(d_X,  h_X,
-                                N * D_IN  * sizeof(float),
-                                cudaMemcpyHostToDevice, stream) );
+    /* ── Phase 1: create 4 streams, each processes one CHUNK of rows ────────── */
+    cudaStream_t streams[NUM_STREAMS];
+    for (int s = 0; s < NUM_STREAMS; ++s)
+        CUDA_CHECK( cudaStreamCreate(&streams[s]) );
 
-    CUDA_CHECK( cudaMemcpyAsync(d_W1, h_W1,
-                                D_IN * D_H * sizeof(float),
-                                cudaMemcpyHostToDevice, stream) );
+    /* Block/grid dimensions — same shape used for both kernels.
+     * The grid Y-dimension is sized to CHUNK rows (not N), since each
+     * kernel invocation only touches CHUNK rows of its slice.             */
+    dim3 block(16, 16);
+    dim3 grid_h(  (D_H  + block.x - 1) / block.x,
+                  (CHUNK + block.y - 1) / block.y );
+    dim3 grid_out((D_OUT + block.x - 1) / block.x,
+                  (CHUNK + block.y - 1) / block.y );
 
-    CUDA_CHECK( cudaMemcpyAsync(d_b1, h_b1,
-                                D_H * sizeof(float),
-                                cudaMemcpyHostToDevice, stream) );
+    for (int s = 0; s < NUM_STREAMS; ++s) {
+        /* Byte / element offsets for this chunk */
+        int  row_off   = s * CHUNK;                      /* row offset in full batch  */
+        int  x_off     = row_off * D_IN;                 /* element offset into X     */
+        int  h_off     = row_off * D_H;                  /* element offset into H     */
+        int  y_off     = row_off * D_OUT;                /* element offset into Y     */
 
-    CUDA_CHECK( cudaMemcpyAsync(d_W2, h_W2,
-                                D_H * D_OUT * sizeof(float),
-                                cudaMemcpyHostToDevice, stream) );
+        /* Pointers into the contiguous device buffers for this chunk */
+        float *d_X_s   = d_X + x_off;
+        float *d_H_s   = d_H + h_off;
+        float *d_Y_s   = d_Y + y_off;
 
-    CUDA_CHECK( cudaMemcpyAsync(d_b2, h_b2,
-                                D_OUT * sizeof(float),
-                                cudaMemcpyHostToDevice, stream) );
+        /* Pointers into pinned host buffers for this chunk */
+        const float *h_X_s = h_X + x_off;
+        float       *h_Y_s = h_Y + y_off;
 
-    /* TODO 16 — Launch kernel 1: hidden layer H = ReLU(X @ W1 + b1) */
-    dim3 block1(16, 16);
-    dim3 grid1( (D_H  + block1.x - 1) / block1.x,
-                (N    + block1.y - 1) / block1.y );
-    matmul_relu_kernel<<<grid1, block1, 0, stream>>>(
-        d_X, d_W1, d_b1, d_H, N, D_IN, D_H);
-    CUDA_CHECK( cudaGetLastError() );
+        /* (a) H2D: transfer this chunk's rows of X */
+        CUDA_CHECK( cudaMemcpyAsync(d_X_s, h_X_s,
+                                    CHUNK * D_IN * sizeof(float),
+                                    cudaMemcpyHostToDevice, streams[s]) );
 
-    /* TODO 17 — Launch kernel 2: output layer Y = H @ W2 + b2 */
-    dim3 block2(16, 16);
-    dim3 grid2( (D_OUT + block2.x - 1) / block2.x,
-                (N    + block2.y - 1) / block2.y );
-    matmul_kernel<<<grid2, block2, 0, stream>>>(
-        d_H, d_W2, d_b2, d_Y, N, D_H, D_OUT);
-    CUDA_CHECK( cudaGetLastError() );
+        /* (b) Kernel 1: hidden layer H_s = ReLU(X_s @ W1 + b1)
+         *     Reads d_X_s (just copied) and d_W1/d_b1 (copied in Phase 0).
+         *     rows_A = CHUNK; the kernel sees a CHUNK×D_IN input.           */
+        matmul_relu_kernel<<<grid_h, block, 0, streams[s]>>>(
+            d_X_s, d_W1, d_b1, d_H_s, CHUNK, D_IN, D_H);
+        CUDA_CHECK( cudaGetLastError() );
 
-    /* TODO 18 — Async D2H copy of Y */
-    CUDA_CHECK( cudaMemcpyAsync(h_Y, d_Y,
-                                N * D_OUT * sizeof(float),
-                                cudaMemcpyDeviceToHost, stream) );
+        /* (c) Kernel 2: output layer Y_s = H_s @ W2 + b2
+         *     rows_A = CHUNK; the kernel sees a CHUNK×D_H input.            */
+        matmul_kernel<<<grid_out, block, 0, streams[s]>>>(
+            d_H_s, d_W2, d_b2, d_Y_s, CHUNK, D_H, D_OUT);
+        CUDA_CHECK( cudaGetLastError() );
 
-    /* TODO 19 — Synchronise and destroy stream */
-    CUDA_CHECK( cudaStreamSynchronize(stream) );
-    CUDA_CHECK( cudaStreamDestroy(stream) );
+        /* (d) D2H: copy this chunk's Y back to pinned host memory */
+        CUDA_CHECK( cudaMemcpyAsync(h_Y_s, d_Y_s,
+                                    CHUNK * D_OUT * sizeof(float),
+                                    cudaMemcpyDeviceToHost, streams[s]) );
+    }
+
+    /* ── Phase 2: wait for all streams, then release them ───────────────────── */
+    for (int s = 0; s < NUM_STREAMS; ++s) {
+        CUDA_CHECK( cudaStreamSynchronize(streams[s]) );
+        CUDA_CHECK( cudaStreamDestroy(streams[s]) );
+    }
 }
 
 
 /* ═════════════════════════════════════════════════════════════════════════════
- * MAIN 
+ * MAIN — do not modify
  * ═════════════════════════════════════════════════════════════════════════════*/
 int main(void)
 {

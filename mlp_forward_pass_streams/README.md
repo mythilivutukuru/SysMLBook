@@ -1,6 +1,6 @@
-# MLP Forward Pass with Streams
+# MLP Forward Pass with 4 Streams
 
-In this assignment, you will implement the forward pass of a two-layer Multi-Layer Perceptron (MLP) using CUDA. You will write two custom kernels — one for a fused matrix-multiply + ReLU activation, and one for a plain matrix-multiply output layer — and orchestrate them using **CUDA streams** for potential overlap with memory transfers.
+In this assignment, you will implement the forward pass of a two-layer Multi-Layer Perceptron (MLP) using CUDA. You will write two custom kernels — one for a fused matrix-multiply + ReLU activation, and one for a plain matrix-multiply output layer — and orchestrate them using **four concurrent CUDA streams** to overlap host-to-device transfers with kernel execution.
 
 ---
 
@@ -35,7 +35,7 @@ Each output element `C[i][j]` is the dot product of row `i` of **A** and column 
 C[i][j] = sum_k  A[i][k] * B[k][j]  +  bias[j]
 ```
 
-A naïve CUDA kernel assigns one thread per output element. A tile-based shared memory kernel (extra credit) is significantly faster.
+A naïve CUDA kernel assigns one thread per output element.
 
 ### ReLU Activation
 
@@ -49,71 +49,104 @@ In your kernel you will fuse this into the MatMul itself — compute the dot pro
 
 ### Pinned (Page-Locked) Host Memory
 
-Ordinary `malloc` memory can be swapped to disk by the OS at any time. The GPU's DMA engine requires memory whose physical pages are guaranteed to stay resident.
-
-`cudaMallocHost` allocates page-locked memory directly:
+`cudaMallocHost` allocates page-locked memory that the GPU's DMA engine can read/write directly, enabling asynchronous (overlapped) transfers:
 
 ```c
 float *h_X;
 cudaMallocHost(&h_X, bytes);   // pinned — DMA can read/write directly
-// ...
 cudaFreeHost(h_X);             // must use cudaFreeHost, NOT free()
 ```
 
-### CUDA Streams
+### CUDA Streams and Overlap
 
-A **CUDA stream** is a sequence of GPU operations that execute in issue order relative to each other, but may overlap with operations in *other* streams.
-
-Key API calls you will use:
+A **CUDA stream** is a sequence of GPU operations that execute in order relative to each other but may overlap with operations in *other* streams.
 
 ```c
 cudaStream_t stream;
-cudaStreamCreate(&stream);                        // create
-kernel<<<grid, block, 0, stream>>>(...);          // launch into stream
-cudaMemcpyAsync(dst, src, bytes, kind, stream);   // async copy in stream
-cudaStreamSynchronize(stream);                    // wait for stream
-cudaStreamDestroy(stream);                        // cleanup
+cudaStreamCreate(&stream);
+kernel<<<grid, block, 0, stream>>>(...);
+cudaMemcpyAsync(dst, src, bytes, kind, stream);
+cudaStreamSynchronize(stream);
+cudaStreamDestroy(stream);
 ```
 
-Why streams here? In a real inference server you would overlap the **H2D copy** of a new batch with the **kernel execution** of the current batch, or overlap the **D2H copy** of results with the next batch's computation. Pinned memory is the prerequisite that makes this overlap physically possible.
+**Why 4 streams?** The GPU has an independent DMA copy engine. When the batch is split across 4 streams, the copy engine can transfer X for stream `s+1` while the SMs execute kernels for stream `s`, cutting end-to-end latency compared to a single serialised stream.
 
 ---
 
 ## Task
 
-You are given `student.cu`. It contains:
+### Design
 
-- All data structure definitions and host-side setup code (do **not** modify these).
-- A CPU reference implementation (`mlp_cpu`) for correctness checking.
-- Two kernel stubs with `TODO` comments:
-  - `matmul_relu_kernel` — fused MatMul + ReLU for the hidden layer.
-  - `matmul_kernel` — plain MatMul + bias for the output layer.
-- A launch wrapper stub `mlp_forward_gpu` with `TODO` comments for stream creation, async memory copies, kernel launches, and synchronization.
-- A `main` function that runs both the CPU and GPU paths and compares outputs.
+The batch (`N = 64` rows) is divided into `NUM_STREAMS = 4` equal chunks of `CHUNK = 16` rows. Stream `s` owns rows `[s*CHUNK, (s+1)*CHUNK)`.
+
+#### Phase 0 — Weight Upload (one-time, synchronous)
+
+W1, b1, W2, b2 are **shared and read-only** across all chunks. They are copied to the device **once** with blocking `cudaMemcpy` before any stream starts.
+
+#### Phase 1 — Per-Stream Pipeline (all 4 streams in flight)
+
+For each stream `s`:
+
+| Step | Operation | Detail |
+|------|-----------|--------|
+| (a) | H2D async copy | `CHUNK` rows of `X` → `d_X + s*CHUNK*D_IN` |
+| (b) | `matmul_relu_kernel` | Slice of `X` × `W1` + `b1`, ReLU → slice of `H` |
+| (c) | `matmul_kernel` | Slice of `H` × `W2` + `b2` → slice of `Y` |
+| (d) | D2H async copy | `CHUNK` rows of `Y` ← `d_Y + s*CHUNK*D_OUT` |
+
+Within a single stream, (a)→(b)→(c)→(d) are strictly ordered. Across streams, the GPU overlaps the H2D copy of stream `s+1` with the kernel execution of stream `s`.
+
+```
+Stream 0:  [H2D X₀]──[ReLU]──[MatMul]──[D2H Y₀]
+Stream 1:       [H2D X₁]──[ReLU]──[MatMul]──[D2H Y₁]
+Stream 2:            [H2D X₂]──[ReLU]──[MatMul]──[D2H Y₂]
+Stream 3:                 [H2D X₃]──[ReLU]──[MatMul]──[D2H Y₃]
+           ──────────────────────────────────────────────────▶ time
+```
+
+#### Phase 2 — Synchronise and Destroy
+
+`cudaStreamSynchronize` + `cudaStreamDestroy` called for all 4 streams.
 
 ### Your Tasks
 
-1. **`matmul_relu_kernel`**
-   - Each thread computes one element of the output matrix.
-   - Compute the dot product, add the corresponding bias, apply ReLU, and write to output.
+Both kernels operate on **slices** of the full batch — `rows_A = CHUNK`, not `N`.
 
-2. **`matmul_kernel`**
-   - Same as above but **without** the ReLU clamp.
+**`matmul_relu_kernel`** (TODOs 1–5):
+- TODO 1: Compute `col = threadIdx.x + blockIdx.x * blockDim.x`, `row = threadIdx.y + blockIdx.y * blockDim.y`
+- TODO 2: Guard — return if `row >= rows_A || col >= cols_B`
+- TODO 3: Accumulate dot product over `k = 0..inner-1`: `acc += A[row*inner+k] * B[k*cols_B+col]`
+- TODO 4: Add `bias[col]`
+- TODO 5: Write `fmaxf(acc, 0.0f)` to `C[row*cols_B+col]`
 
-3. **`mlp_forward_gpu`**
-   - Create a CUDA stream.
-   - Asynchronously copy all inputs (X, W1, b1, W2, b2) to the device using the stream.
-   - Launch `matmul_relu_kernel` in the stream to produce H.
-   - Launch `matmul_kernel` in the stream to produce Y.
-   - Asynchronously copy Y back to host in the stream.
-   - Synchronize and destroy the stream.
+**`matmul_kernel`** (TODOs 6–9): identical except no `fmaxf` in TODO 9 — just write `acc + bias[col]`.
+
+#### Launch Wrapper (TODOs 10–21)
+
+**Phase 0 — weight upload:**
+- TODOs 10–13: `cudaMemcpy` (blocking) for W1, b1, W2, b2
+
+**Phase 1 — stream setup:**
+- TODO 14: `cudaStream_t streams[NUM_STREAMS]`; `cudaStreamCreate` for each
+- TODO 15: `dim3 block(16,16)`, `dim3 grid_h` (sized to `D_H` × `CHUNK`), `dim3 grid_out` (sized to `D_OUT` × `CHUNK`)
+
+**Per-stream loop body:**
+- TODO 16: Compute `row_off`, `x_off`, `h_off`, `y_off`; derive slice pointers
+- TODO 17: `cudaMemcpyAsync` — X slice H2D into `streams[s]`
+- TODO 18: Launch `matmul_relu_kernel` with `rows_A = CHUNK` into `streams[s]`
+- TODO 19: Launch `matmul_kernel` with `rows_A = CHUNK` into `streams[s]`
+- TODO 20: `cudaMemcpyAsync` — Y slice D2H into `streams[s]`
+
+**Phase 2:**
+- TODO 21: `cudaStreamSynchronize` + `cudaStreamDestroy` for each stream
 
 ### Constraints
 
-- Do **not** use `cudaMemcpy` (blocking); use `cudaMemcpyAsync` with your stream.
+- In the per-stream loop, use **`cudaMemcpyAsync`** (not blocking `cudaMemcpy`) so transfers can overlap across streams.
+- For weight uploads in Phase 0, use blocking **`cudaMemcpy`** — they happen once before any stream starts.
 - Do **not** use cuBLAS or any external math library.
-- Grid and block dimensions are provided as hints in the stub — you may adjust them.
-- Keep all other code (CPU reference, main, error checking) unchanged.
+- Keep the kernels, CPU reference, and `main` unchanged in structure.
 
 ---
 
@@ -122,11 +155,11 @@ You are given `student.cu`. It contains:
 The `main` function automatically:
 
 1. Runs the CPU reference forward pass.
-2. Runs your GPU forward pass.
+2. Runs your GPU forward pass (4-stream).
 3. Compares every element of the output matrix Y element-wise with a tolerance of **1e-3**.
-4. Prints `PASS` if all elements match, or `FAIL` with the first mismatched index and values.
+4. Prints `PASS` if all elements match, or `FAIL` with the first mismatched index.
 
-Sample expected output on success:
+Expected output on success:
 
 ```
 [CPU] MLP forward pass complete.
@@ -135,4 +168,5 @@ Checking correctness...
 Max absolute error: 0.000023
 PASS: GPU output matches CPU reference.
 ```
+
 ---
