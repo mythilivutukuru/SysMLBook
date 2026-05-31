@@ -37,7 +37,7 @@ Each block handles one full output row $O[b, h, i, :]$.
 
 ### Visualization
 
-<!-- Add your visualization image here -->
+![standard_attention_visualization](./standard_attention_visualization.png)
 
 ---
 
