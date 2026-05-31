@@ -41,6 +41,7 @@ Each assignment lives in its own folder with these files:
 | Assignment | Topic | Language |
 |------------|-------|----------|
 | [SIMD](./simd) | SIMD Matrix Multiplication | C++ |
+| [Vector_Addition](./vector_addition/) | Vector Addition | CUDA |
 | [CNN](./convolutional_neural_network/) | Convolutional Neural Network | CUDA |
 | [Sliding_Window_Attention](./sliding_window_attention_cuda/) | Sliding Window Attention | CUDA |
 | [Matrix_Transpose](./matrix_transpose_shared_memory/) | Matrix Transpose Using Shared Memory | CUDA |
