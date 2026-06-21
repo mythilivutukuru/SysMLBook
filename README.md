@@ -36,6 +36,12 @@ Each assignment lives in its own folder with these files:
 
 ## Assignments
 
+### Chapter 2: Overview of Deep Learning Concepts
+
+| Assignment | Topic | Language |
+|------------|-------|----------|
+| [Sliding_Window_Attention](./sliding_window_attention_python/) | Sliding Window Attention | Python |
+
 ### Chapter 3: Programming AI Hardware
 
 | Assignment | Topic | Language |
