@@ -40,6 +40,7 @@ Each assignment lives in its own folder with these files:
 
 | Assignment | Topic | Language |
 |------------|-------|----------|
+| [Multi_Layer_Perceptron](./multi_layer_perceptron/) | Multi-Layer Perceptron | Python |
 | [Sliding_Window_Attention](./sliding_window_attention_python/) | Sliding Window Attention | Python |
 | [KV_Caching_nanoGPT](./kv_caching_nanogpt/) | KV Caching in nanoGPT | Python |
 
