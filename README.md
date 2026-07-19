@@ -59,6 +59,13 @@ Each assignment lives in its own folder with these files:
 | [MLP_Forward_Pass_Streams](./mlp_forward_pass_streams/) | MLP Forward Pass with Streams | CUDA |
 | [Matrix_Multiplication_Tensor_Cores](./matrix_multiplication_tensor_cores/) | Matrix Multiplication Using Tensor Cores | CUDA |
 
+### Chapter 4: Hardware-Aware Performance Optimizations
+
+| Assignment | Topic | Language |
+|------------|-------|----------|
+| [Flash_Attention](./flash_attention) | Flash Attention | CUDA |
+
+
 > More chapters and assignments will be added over time.
 
 ---
