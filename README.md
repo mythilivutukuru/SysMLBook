@@ -63,6 +63,7 @@ Each assignment lives in its own folder with these files:
 
 | Assignment | Topic | Language |
 |------------|-------|----------|
+| [2D_Tiling_Matrix_Multiplication](./2d_tiling_matrix_multiplication) | 2D Tiling in Matrix Multiplication | CUDA |
 | [Flash_Attention](./flash_attention) | Flash Attention | CUDA |
 
 
