@@ -1,4 +1,4 @@
-#Tensor Parallelism
+# Tensor Parallelism
 
 Large language models distribute weights across multiple devices using **Tensor Parallelism**. In linear layers, the weight matrix $B$ is sharded along its column dimension so that each device owns an independent slice and computes its portion of output in parallel; the partial results are then concatenated to reconstruct the full output.
 
