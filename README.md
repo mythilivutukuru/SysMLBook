@@ -66,6 +66,14 @@ Each assignment lives in its own folder with these files:
 | [2D_Tiling_Matrix_Multiplication](./2d_tiling_matrix_multiplication) | 2D Tiling in Matrix Multiplication | CUDA |
 | [Flash_Attention](./flash_attention) | Flash Attention | CUDA |
 
+### Chapter 6: Distributed Training
+
+| Assignment | Topic | Language |
+|------------|-------|----------|
+| [Data_Parallelism](./data_parallelism) | Data Parallelism | Python |
+| [Pipeline_Parallelism](./pipeline_parallelism) | Pipeline Parallelism | Python |
+| [Tensor_Parallelism](./tensor_parallelism) | Tensor Parallelism | Python |
+
 
 > More chapters and assignments will be added over time.
 
