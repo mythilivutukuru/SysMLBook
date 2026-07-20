@@ -86,7 +86,7 @@ Open `student.py` and complete every `# TODO` block.
 - Do not modify any code outside the `# TODO` blocks.
 - Do not add new queues or processes beyond those already provided.
 - Use only `mp.Queue` for inter-process communication; do not use shared memory or pipes.
-- Assume $N \bmod \texttt{num_gpus} = 0$ (no uneven sharding needed).
+- Assume N \bmod \texttt{num-gpus} = 0 (no uneven sharding needed).
 
 ## Testing
 
