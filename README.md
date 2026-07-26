@@ -63,7 +63,11 @@ Each assignment lives in its own folder with these files:
 
 | Assignment | Topic | Language |
 |------------|-------|----------|
+| [One_Element_Per_Thread_Tiling_Matrix_Multiplication](./one_element_per_thread_tiling/) | One Element per Thread Tiling | CUDA |
+| [Row_Wise_Tiling_Matrix_Multiplication](./row_wise_tiling/) | Row-wise Tiling in Matrix Multiplication | CUDA |
+| [Column_Contiguous_Tiling_Matrix_Multiplication](./column_contiguous_tiling/) | Column-Contiguous Tiling in Matrix Multiplication | CUDA |
 | [2D_Tiling_Matrix_Multiplication](./2d_tiling_matrix_multiplication) | 2D Tiling in Matrix Multiplication | CUDA |
+| [Register_Tiling_Matrix_Multiplication](./register_tiling) | Register Tiling in Matrix Multiplication | CUDA |
 | [Flash_Attention](./flash_attention) | Flash Attention | CUDA |
 
 ### Chapter 6: Distributed Training
