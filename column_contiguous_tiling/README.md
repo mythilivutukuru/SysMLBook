@@ -77,13 +77,11 @@ Let `(localRow, localCol)` = `(threadIdx.y, threadIdx.x)` denote a thread's coor
 
 Each thread is responsible for a **column** of output values:
 
-$$
-\begin{aligned}
-\mathtt{baseGlobalRow} &= \mathtt{blockRow} \times (\mathtt{TILE} \times \mathtt{elems\_per\_thread}), \\
-\mathtt{globalCol} &= \mathtt{blockCol} \times \mathtt{TILE} + \mathtt{localCol}, \\
-\mathtt{threadRowStart} &= \mathtt{baseGlobalRow} + \mathtt{localRow} \times \mathtt{elems\_per\_thread}.
-\end{aligned}
-$$
+```
+baseGlobalRow  = blockRow * (TILE * elems_per_thread)
+globalCol      = blockCol * TILE + localCol
+threadRowStart = baseGlobalRow + localRow * elems_per_thread
+```
 
 The thread computes the `elems_per_thread` output elements at rows
 `threadRowStart, threadRowStart + 1, ..., threadRowStart + elems_per_thread - 1`, all in column `globalCol`. Note that these output rows are **contiguous**, hence the name of the kernel.

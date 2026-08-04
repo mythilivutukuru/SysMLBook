@@ -59,12 +59,23 @@ Each thread owns exactly **one row** of the output tile, and computes
 that row, entirely in registers. Therefore:
 
 - Each thread block computes a
-  $\mathtt{TILE} \times (\mathtt{TILE} \cdot \mathtt{elems\_per\_thread})$
-  tile of $C$.
-- The block dimension is $\mathtt{TILE} \times \mathtt{TILE}$ threads
-  (`localCol` indexes columns within a sub-tile, `localRow` indexes the
-  row).
-- The grid dimension along $x$ is scaled down by
+
+  ```text
+  TILE × (TILE * elems_per_thread)
+  ```
+
+  tile of `C`.
+
+- The block dimension is
+
+  ```text
+  TILE × TILE
+  ```
+
+  threads (`localCol` indexes columns within a sub-tile, `localRow`
+  indexes the row).
+
+- The grid dimension along `x` is scaled down by
   `elems_per_thread` since each block now covers that many times more
   columns than a naive tiled kernel would.
 
@@ -78,9 +89,9 @@ float* sA = s;                            // TILE * TILE floats
 float* sB = s + TILE * TILE;              // TILE * (TILE * elems_per_thread) floats
 ```
 
-`sA` is a row-major $\mathtt{TILE} \times \mathtt{TILE}$ array holding one
+`sA` is a row-major TILEXTILE array holding one
 K-tile of $A$. `sB` is a row-major
-$\mathtt{TILE} \times (\mathtt{TILE} \cdot \mathtt{elems\_per\_thread})$
+TILEX(TILE.elems_per_thread)$
 array holding `elems_per_thread` side-by-side column-tiles of $B$ for the
 same K-tile, laid out contiguously so that row `k` of `sB` starts at
 offset `k * (TILE * elems_per_thread)`.
@@ -92,12 +103,10 @@ thread coordinates inside a block.
 
 Each thread computes an output row segment beginning at:
 
-$$
-\begin{aligned}
-\mathtt{globalRow} &= \mathtt{blockIdx.y} \times \mathtt{TILE} + \mathtt{localRow}, \\
-\mathtt{baseGlobalCol} &= \mathtt{blockIdx.x} \times (\mathtt{TILE} \times \mathtt{elems\_per\_thread}).
-\end{aligned}
-$$
+```text
+globalRow     = blockIdx.y * TILE + localRow
+baseGlobalCol = blockIdx.x * (TILE * elems_per_thread)
+```
 
 The $e$-th element ($0 \le e < \mathtt{elems\_per\_thread}$) that this
 thread owns sits at global column
