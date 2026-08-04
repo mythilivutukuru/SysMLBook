@@ -108,9 +108,9 @@ globalRow     = blockIdx.y * TILE + localRow
 baseGlobalCol = blockIdx.x * (TILE * elems_per_thread)
 ```
 
-The $e$-th element ($0 \le e < \mathtt{elems\_per\_thread}$) that this
+The `e`-th element (`0 <= e < elems_per_thread`) that this
 thread owns sits at global column
-$\mathtt{baseGlobalCol} + \mathtt{localCol} + e \times \mathtt{TILE}$.
+`baseGlobalCol + localCol + e * TILE`.
 
 Each thread must:
 
