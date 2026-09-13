@@ -36,6 +36,12 @@ Each assignment lives in its own folder with these files:
 
 ## Assignments
 
+### Chapter 1: Introduction
+
+| Assignment | Topic | Language |
+|------------|-------|----------|
+| [Kaggle_Setup_Guide](./kaggle_setup_guide) | Kaggle Setup Guide | English :) |
+
 ### Chapter 2: Overview of Deep Learning Concepts
 
 | Assignment | Topic | Language |
@@ -70,6 +76,11 @@ Each assignment lives in its own folder with these files:
 | [Register_Tiling_Matrix_Multiplication](./register_tiling) | Register Tiling in Matrix Multiplication | CUDA |
 | [Flash_Attention](./flash_attention) | Flash Attention | CUDA |
 
+### Chapter 5: Machine Learning Programming Frameworks
+
+| Assignment | Topic | Language |
+|------------|-------|----------|
+
 ### Chapter 6: Distributed Training
 
 | Assignment | Topic | Language |
@@ -78,8 +89,17 @@ Each assignment lives in its own folder with these files:
 | [Pipeline_Parallelism](./pipeline_parallelism) | Pipeline Parallelism | Python |
 | [Tensor_Parallelism](./tensor_parallelism) | Tensor Parallelism | Python |
 
+### Chapter 7: Networking Optimizations
 
-> More chapters and assignments will be added over time.
+| Assignment | Topic | Language |
+|------------|-------|----------|
+
+### Chapter 8: LLM Inference Optimizations
+
+| Assignment | Topic | Language |
+|------------|-------|----------|
+
+> More assignments will be added over time.
 
 ---
 
@@ -92,7 +112,6 @@ If you use this material, please cite the textbook:
   title       = {Systems for Machine Learning},
   author      = {Mythili Vutukuru and Saksham Rathi},
   year        = {2026},
-  institution = {Indian Institute of Technology Bombay},
   url         = {https://www.cse.iitb.ac.in/~mythili/sysml/}
 }
 ```
