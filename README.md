@@ -41,6 +41,7 @@ Each assignment lives in its own folder with these files:
 | Assignment | Topic | Language |
 |------------|-------|----------|
 | [Kaggle_Setup_Guide](./kaggle_setup_guide) | Kaggle Setup Guide | English :) |
+| [Pytorch_Fundamentals](./pytorch_fundamentals) | PyTorch Fundamentals | Python |
 
 ### Chapter 2: Overview of Deep Learning Concepts
 
@@ -98,6 +99,7 @@ Each assignment lives in its own folder with these files:
 
 | Assignment | Topic | Language |
 |------------|-------|----------|
+
 
 > More assignments will be added over time.
 
