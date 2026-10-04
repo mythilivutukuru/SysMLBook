@@ -101,6 +101,7 @@ Each assignment lives in its own folder with these files:
 |------------|-------|----------|
 | [Prefix_Sharing_nanoGPT](./prefix_sharing_nanogpt/) | Prefix Sharing in nanoGPT | Python |
 | [Radix_Tree_nanoGPT](./radix_tree_nanogpt/) | Radix Tree in nanoGPT | Python |
+| [Decode_Prio_nanovLLM](./decode_prio_nanovllm/) | Decode-Priority Scheduling in Nano-vLLM | Python |
 
 > More assignments will be added over time.
 
