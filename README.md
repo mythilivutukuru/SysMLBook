@@ -99,7 +99,7 @@ Each assignment lives in its own folder with these files:
 
 | Assignment | Topic | Language |
 |------------|-------|----------|
-
+| [Prefix_Sharing_nanoGPT](./prefix_sharing_nanogpt/) | Prefix Sharing in nanoGPT | Python |
 
 > More assignments will be added over time.
 
