@@ -95,7 +95,7 @@ Each assignment lives in its own folder with these files:
 | Assignment | Topic | Language |
 |------------|-------|----------|
 
-### Chapter 8: LLM Inference Optimizations
+### Chapter 8: LLM Inference
 
 | Assignment | Topic | Language |
 |------------|-------|----------|
