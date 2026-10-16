@@ -21,12 +21,13 @@
  */
 __global__ void smem_cuda_transpose(int m, float *a, float *c)
 {
-    // Shared memory tile
+    // Shared memory tile 
+    // Note: changing to [THREADS_PER_BLOCK_Y + 1] eliminates bank conflicts, covered in Ch. 4
     __shared__ float smemArray[THREADS_PER_BLOCK_X][THREADS_PER_BLOCK_Y];
 
     // Global indices
-    const int myRow = blockDim.x * blockIdx.x + threadIdx.x;
-    const int myCol = blockDim.y * blockIdx.y + threadIdx.y;
+    const int myRow = blockDim.y * blockIdx.y + threadIdx.y;
+    const int myCol = blockIdx.x * blockDim.x + threadIdx.x;
 
     // Tile origin indices
     const int tileX = blockDim.x * blockIdx.x;
@@ -37,7 +38,7 @@ __global__ void smem_cuda_transpose(int m, float *a, float *c)
     // -------------------------
     if (myRow < m && myCol < m)
     {
-        smemArray[threadIdx.x][threadIdx.y] =
+        smemArray[threadIdx.y][threadIdx.x] =
             a[INDX(myRow, myCol, m)];
     }
 
@@ -50,9 +51,9 @@ __global__ void smem_cuda_transpose(int m, float *a, float *c)
     if ((tileY + threadIdx.x) < m &&
         (tileX + threadIdx.y) < m)
     {
-        c[INDX(tileY + threadIdx.x,
-               tileX + threadIdx.y, m)] =
-            smemArray[threadIdx.y][threadIdx.x];
+        c[INDX(tileX + threadIdx.y,
+               tileY + threadIdx.x, m)] =
+            smemArray[threadIdx.x][threadIdx.y];
     }
 }
 
