@@ -94,6 +94,8 @@ Each assignment lives in its own folder with these files:
 
 | Assignment | Topic | Language |
 |------------|-------|----------|
+| [Ring_All_Reduce](./ring_allreduce/) | Ring AllReduce | Python |
+| [Tree_All_Reduce](./tree_allreduce/) | Tree AllReduce | Python |
 
 ### Chapter 8: LLM Inference
 
